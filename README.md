@@ -11,10 +11,10 @@ Run the following commands in the `backend/chat` directory:
 npm install
 
 # Install core dependencies
-npm i express dotenv mongoose axios cors redis jsonwebtoken
+npm i express dotenv mongoose axios cors redis jsonwebtoken cloudinary multer multer-storage-cloudinary
 
 # Install dev dependencies
-npm i -D typescript nodemon concurrently @types/express @types/dotenv @types/mongoose @types/cors @types/redis @types/jsonwebtoken
+npm i -D typescript nodemon concurrently @types/express @types/dotenv @types/mongoose @types/cors @types/redis @types/jsonwebtoken @types/multer
 ```
 
 ## Environment Variables
