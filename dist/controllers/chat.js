@@ -204,7 +204,7 @@ exports.getMessageByChat = (0, TryCatchBlock_1.default)(async (req, res) => {
     }).sort({ createdAt: 1 });
     const otherUserId = chat.users.find((id) => id !== userId);
     try {
-        const { data } = axios_1.default.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
+        const { data } = await axios_1.default.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
         if (!otherUserId) {
             res.status(401).json({
                 message: "Unauthorized request."
