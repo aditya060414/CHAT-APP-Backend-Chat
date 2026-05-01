@@ -36,7 +36,7 @@ Object.defineProperty(exports, "__esModule", { value: true });
 const mongoose_1 = __importStar(require("mongoose"));
 const chatSchema = new mongoose_1.Schema({
     users: [{ type: String, require: true }],
-    latesMessage: {
+    latestMessage: {
         text: { type: String, require: true },
         sender: { type: String, require: true },
     },
