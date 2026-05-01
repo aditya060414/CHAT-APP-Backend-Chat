@@ -1,7 +1,7 @@
 import { Document, Model } from "mongoose";
 export interface IChat extends Document {
     users: string[];
-    latesMessage: {
+    latestMessage: {
         text: string;
         sender: string;
     };
