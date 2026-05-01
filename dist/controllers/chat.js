@@ -60,7 +60,7 @@ exports.getAllChats = (0, TryCatchBlock_1.default)(async (req, res) => {
                 user: data,
                 chat: {
                     ...chat.toObject(),
-                    latestMessage: chat.latesMessage || null,
+                    latestMessage: chat.latestMessage || null,
                     unseenCount,
                 }
             };
@@ -70,7 +70,7 @@ exports.getAllChats = (0, TryCatchBlock_1.default)(async (req, res) => {
             return {
                 user: { id: otherUserId, name: "Unknown" },
                 ...chat.toObject(),
-                latestMessage: chat.latesMessage || null,
+                latestMessage: chat.latestMessage || null,
                 unseenCount,
             };
         }
@@ -145,7 +145,7 @@ exports.sendMessage = (0, TryCatchBlock_1.default)(async (req, res) => {
     const savedMessage = await message.save();
     const latestMessageText = imageFile ? "📷" : text;
     await Chat_js_1.default.findByIdAndUpdate(chatId, {
-        latesMessage: {
+        latestMessage: {
             text: latestMessageText,
             sender: senderId,
         },
