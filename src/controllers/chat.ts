@@ -1,265 +1,280 @@
-import TryCatch from "../config/TryCatchBlock"
-import { AuthenticatedRequest } from "../middlewares/Auth"
-import Chat from "../models/Chat.js"
-import { Messages } from "../models/Messages"
-import axios from "axios"
+import TryCatch from "../config/TryCatchBlock";
+import { AuthenticatedRequest } from "../middlewares/Auth";
+import Chat from "../models/Chat.js";
+import { Messages } from "../models/Messages";
+import axios from "axios";
 
-
-export const CreateNewChat = TryCatch(async (req: AuthenticatedRequest, res) => {
+export const CreateNewChat = TryCatch(
+  async (req: AuthenticatedRequest, res) => {
     const userId = req.user?._id;
     const { otherUserId } = req.body;
 
     if (!otherUserId) {
-        res.status(400).json({
-            message: "Please provide the other user"
-        })
-        return;
+      res.status(400).json({
+        message: "Please provide the other user",
+      });
+      return;
     }
 
     const existingChat = await Chat.findOne({
-        users: { $all: [userId, otherUserId], $size: 2 }
-    })
+      users: { $all: [userId, otherUserId], $size: 2 },
+    });
 
     if (existingChat) {
-        res.json({
-            message: "Chat already exists",
-            chatId: existingChat._id,
-        });
-        return;
+      res.json({
+        message: "Chat already exists",
+        chatId: existingChat._id,
+      });
+      return;
     }
     const newChat = await Chat.create({
-        users: [userId, otherUserId]
+      users: [userId, otherUserId],
     });
 
     res.status(201).json({
-        message: "Chat created successfully",
-        chatId: newChat._id,
-    })
-})
+      message: "Chat created successfully",
+      chatId: newChat._id,
+    });
+  },
+);
 
 export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
-    const userId = req.user?._id;
+  const userId = req.user?._id;
 
-    if (!userId) {
-        res.status(401).json({
-            message: "Unauthorized request",
-        });
-        return;
-    }
+  if (!userId) {
+    res.status(401).json({
+      message: "Unauthorized request",
+    });
+    return;
+  }
 
-    const chats = await Chat.find({
-        users: userId,
-    }).sort({ updatedAt: -1 })
-    // .populate("users", "name")
+  const chats = await Chat.find({
+    users: userId,
+  }).sort({ updatedAt: -1 });
+  // .populate("users", "name")
 
-    const chatWithUserData = await Promise.all(
-        chats.map(async (chat) => {
-            const otherUserId = chat.users.find((id) => id !== userId);
-            const unseenCount = await Messages.countDocuments({
-                chatId: chat._id,
-                sender: { $ne: userId },
-                seen: false,
-            })
+  const chatWithUserData = await Promise.all(
+    chats.map(async (chat) => {
+      const otherUserId = chat.users.find((id) => id !== userId);
+      const unseenCount = await Messages.countDocuments({
+        chatId: chat._id,
+        sender: { $ne: userId },
+        seen: false,
+      });
 
-            try {
-                const { data } = await axios.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`)
+      try {
+        const { data } = await axios.get(
+          `${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`,
+        );
 
-                return {
-                    user: data,
-                    chat: {
-                        ...chat.toObject(),
-                        latestMessage: chat.latesMessage || null,
-                        unseenCount,
-                    }
-                }
-            } catch (error) {
-                console.log(error);
-                return {
-                    user: { id: otherUserId, name: "Unknown" },
-                    ...chat.toObject(),
-                    latestMessage: chat.latesMessage || null,
-                    unseenCount,
-                }
-            }
-        })
-    );
+        return {
+          user: data,
+          chat: {
+            ...chat.toObject(),
+            latestMessage: chat.latestMessage || null,
+            unseenCount,
+          },
+        };
+      } catch (error) {
+        console.log(error);
+        return {
+          user: { id: otherUserId, name: "Unknown" },
+          ...chat.toObject(),
+          latestMessage: chat.latestMessage || null,
+          unseenCount,
+        };
+      }
+    }),
+  );
 
-    res.status(200).json({
-        chats: chatWithUserData,
-    })
-})
+  res.status(200).json({
+    chats: chatWithUserData,
+  });
+});
 
 export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
-    const senderId = req.user?._id;
-    const { chatId, text } = req.body;
-    const imageFile = req.file;
+  const senderId = req.user?._id;
+  const { chatId, text } = req.body;
+  const imageFile = req.file;
 
-    if (!senderId) {
-        res.status(401).json({
-            messages: "Unauthorized request"
-        });
-        return;
-    }
+  if (!senderId) {
+    res.status(401).json({
+      messages: "Unauthorized request",
+    });
+    return;
+  }
 
-    if (!chatId) {
-        res.status(400).json({
-            message: "Id missing."
-        });
-        return;
-    }
-    if (!text && !imageFile) {
-        res.status(400).json({
-            message: "Missing data."
-        });
-        return;
-    }
+//   const senderUser = await User.findById(senderId).select("name");
 
-    const chat = await Chat.findById(chatId);
-    if (!chat) {
-        res.status(404).json({
-            message: "Chat not found."
-        });
-        return;
-    }
+  if (!chatId) {
+    res.status(400).json({
+      message: "Id missing.",
+    });
+    return;
+  }
+  if (!text && !imageFile) {
+    res.status(400).json({
+      message: "Missing data.",
+    });
+    return;
+  }
 
-    const isUserInChat = chat.users.some(
-        (userId) => userId.toString() === senderId.toString()
-    )
+  const chat = await Chat.findById(chatId);
+  if (!chat) {
+    res.status(404).json({
+      message: "Chat not found.",
+    });
+    return;
+  }
 
-    if (!isUserInChat) {
-        res.status(403).json({
-            message: "Unauthorized request"
-        });
-        return;
-    }
+  const isUserInChat = chat.users.some(
+    (userId) => userId.toString() === senderId.toString(),
+  );
 
-    const otherUserId = chat.users.find(
-        (userId) => userId.toString() !== senderId.toString()
-    )
+  if (!isUserInChat) {
+    res.status(403).json({
+      message: "Unauthorized request",
+    });
+    return;
+  }
 
+  const otherUserId = chat.users.find(
+    (userId) => userId.toString() !== senderId.toString(),
+  );
 
-    if (!otherUserId) {
-        res.status(401).json({
-            messages: "Unauthorized request"
-        });
-        return;
-    }
+  if (!otherUserId) {
+    res.status(401).json({
+      messages: "Unauthorized request",
+    });
+    return;
+  }
 
-    // socket setup
+  // socket setup
 
-    let messageData: any = {
-        chatId: chatId,
-        sender: senderId,
-        seen: false,
-        seenAt: undefined,
+  let messageData: any = {
+    chatId: chatId,
+    sender: senderId,
+    seen: false,
+    seenAt: undefined,
+  };
+
+  if (imageFile) {
+    messageData.image = {
+      url: imageFile.path,
+      publicId: imageFile.filename,
     };
+    messageData.messageType = "image";
+    messageData.text = text || " ";
+  } else {
+    messageData.text = text;
+    messageData.messageType = "text";
+  }
 
-    if (imageFile) {
-        messageData.image = {
-            url: imageFile.path,
-            publicId: imageFile.filename,
-        };
-        messageData.messageType = "image";
-        messageData.text = text || " ";
-    } else {
-        messageData.text = text;
-        messageData.messageType = "text";
-    }
+  const message = new Messages(messageData);
+  const savedMessage = await message.save();
 
-    const message = new Messages(messageData);
-    const savedMessage = await message.save();
+  const latestMessageText = imageFile ? "📷" : text;
 
-    const latestMessageText = imageFile ? "📷" : text;
-
-    await Chat.findByIdAndUpdate(chatId, {
-        latesMessage: {
-            text: latestMessageText,
-            sender: senderId,
-        },
-        updatedAt: new Date(),
-    }, { new: true })
-
-    // emit socket
-
-    res.status(201).json({
-        message: savedMessage,
+  await Chat.findByIdAndUpdate(
+    chatId,
+    {
+      latesMessage: {
+        text: latestMessageText,
         sender: senderId,
-    })
-})
+      },
+      updatedAt: new Date(),
+    },
+    { new: true },
+  );
 
-export const getMessageByChat = TryCatch(async (req: AuthenticatedRequest, res) => {
+  // emit socket
+
+  res.status(201).json({
+    message: savedMessage,
+    sender: senderId,
+  });
+});
+
+export const getMessageByChat = TryCatch(
+  async (req: AuthenticatedRequest, res) => {
     const userId = req.user?._id;
     const { chatId } = req.params;
 
     if (!chatId) {
-        res.status(400).json({
-            message: "Id missing."
-        });
-        return;
+      res.status(400).json({
+        message: "Id missing.",
+      });
+      return;
     }
     if (!userId) {
-        res.status(401).json({
-            message: "Unauthorized Request."
-        });
-        return;
+      res.status(401).json({
+        message: "Unauthorized Request.",
+      });
+      return;
     }
     const chat = await Chat.findById(chatId);
     if (!chat) {
-        res.status(404).json({
-            message: "Chat not found."
-        });
-        return;
+      res.status(404).json({
+        message: "Chat not found.",
+      });
+      return;
     }
     const isUserInChat = chat.users.some(
-        (userId) => userId.toString() === userId.toString()
-    )
+      (userId) => userId.toString() === userId.toString(),
+    );
 
     if (!isUserInChat) {
-        res.status(403).json({
-            message: "Unauthorized request"
-        });
-        return;
+      res.status(403).json({
+        message: "Unauthorized request",
+      });
+      return;
     }
 
     const messageMarkToSeen = await Messages.find({
-        chatId: chatId,
-        sender: { $ne: userId },
-        seen: false,
+      chatId: chatId,
+      sender: { $ne: userId },
+      seen: false,
     });
-    await Messages.updateMany({
+    await Messages.updateMany(
+      {
         chatId: chatId,
         sender: { $ne: userId },
         seen: false,
-    }, {
+      },
+      {
         seen: true,
         seenAt: new Date(),
-    });
+      },
+    );
 
     const messages = await Messages.find({
-        chatId: chatId
+      chatId: chatId,
     }).sort({ createdAt: 1 });
 
     const otherUserId = chat.users.find((id) => id !== userId);
 
     try {
-        const { data } = await axios.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
-        if (!otherUserId) {
-            res.status(401).json({
-                message: "Unauthorized request."
-            });
-            return;
-        }
+      const { data } = await axios.get(
+        `${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`,
+      );
+      if (!otherUserId) {
+        res.status(401).json({
+          message: "Unauthorized request.",
+        });
+        return;
+      }
 
-        // socket work
-        res.status(201).json({
-            messages,
-            user: data,
-        })
+      // socket work
+      res.status(201).json({
+        messages,
+        user: data,
+      });
     } catch (error) {
-        console.log(error);
-        res.json({
-            messages,
-            user: { _id: otherUserId, name: "Unknown" }
-        })
+      console.log(error);
+      res.json({
+        messages,
+        user: { _id: otherUserId, name: "Unknown" },
+      });
     }
-})
+  },
+);
