@@ -1,7 +1,7 @@
 import mongoose, { Document, Schema, Model } from "mongoose";
 
 export interface IChat extends Document {
-  users: string[];
+  users: mongoose.Types.ObjectId[];
   latestMessage: {
     text: string;
     sender: string;
@@ -10,7 +10,7 @@ export interface IChat extends Document {
 
 const chatSchema: Schema<IChat> = new Schema(
   {
-    users: [{ type: String, required: true }],
+    users: [{ type: Schema.Types.ObjectId, ref: "User", required: true }],
     latestMessage: {
       text: { type: String, required: true },
       sender: { type: String, required: true },
