@@ -30,6 +30,7 @@ export const Auth = async (req: AuthenticatedRequest, res: Response, next: NextF
             });
             return;
         }
+        
         req.user = decodedValue.user;
         next();
     } catch (error) {
