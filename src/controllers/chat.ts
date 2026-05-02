@@ -50,15 +50,16 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
 
   const chats = await Chat.find({
     users: userId,
-  }).sort({ updatedAt: -1 });
-  // .populate("users", "name")
+  })
+    .populate("users", "name")
+    .sort({ updatedAt: -1 });
 
   const chatWithUserData = await Promise.all(
     chats.map(async (chat) => {
-      const otherUserId = chat.users.find((id) => id !== userId);
+      const otherUserId = chat.users.find((id) => id.toString() !== userId.toString());
       const unseenCount = await Messages.countDocuments({
         chatId: chat._id,
-        sender: { $ne: userId },
+        sender: { $ne: userId.toString() },
         seen: false,
       });
 
@@ -68,7 +69,7 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
         );
 
         return {
-          user: data,
+          user: data.user,
           chat: {
             ...chat.toObject(),
             latestMessage: chat.latestMessage || null,
@@ -78,10 +79,12 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
       } catch (error) {
         console.log(error);
         return {
-          user: { id: otherUserId, name: "Unknown" },
-          ...chat.toObject(),
-          latestMessage: chat.latestMessage || null,
-          unseenCount,
+          user: { _id: otherUserId, name: "Unknown" },
+          chat: {
+            ...chat.toObject(),
+            latestMessage: chat.latestMessage || null,
+            unseenCount,
+          }
         };
       }
     }),
@@ -104,7 +107,7 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
     return;
   }
 
-//   const senderUser = await User.findById(senderId).select("name");
+  //   const senderUser = await User.findById(senderId).select("name");
 
   if (!chatId) {
     res.status(400).json({
@@ -178,7 +181,7 @@ export const sendMessage = TryCatch(async (req: AuthenticatedRequest, res) => {
   await Chat.findByIdAndUpdate(
     chatId,
     {
-      latesMessage: {
+      latestMessage: {
         text: latestMessageText,
         sender: senderId,
       },
@@ -251,7 +254,7 @@ export const getMessageByChat = TryCatch(
       chatId: chatId,
     }).sort({ createdAt: 1 });
 
-    const otherUserId = chat.users.find((id) => id !== userId);
+    const otherUserId = chat.users.find((id) => id.toString() !== userId);
 
     try {
       const { data } = await axios.get(
@@ -267,7 +270,7 @@ export const getMessageByChat = TryCatch(
       // socket work
       res.status(201).json({
         messages,
-        user: data,
+        user: data.user,
       });
     } catch (error) {
       console.log(error);
