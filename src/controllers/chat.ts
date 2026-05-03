@@ -268,13 +268,13 @@ export const getMessageByChat = TryCatch(
       }
 
       // socket work
-      res.status(201).json({
+      return res.status(201).json({
         messages,
         user: data.user,
       });
     } catch (error) {
       console.log(error);
-      res.json({
+      return res.json({
         messages,
         user: { _id: otherUserId, name: "Unknown" },
       });
