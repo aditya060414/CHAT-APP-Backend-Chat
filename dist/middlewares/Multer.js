@@ -21,7 +21,7 @@ exports.upload = (0, multer_1.default)({
         fileSize: 5 * 1024 * 1024, //5 mb = 5 * 1024kb * 1024byte
     },
     fileFilter: (req, file, cb) => {
-        if (file.mimetype.startsWith("/image/")) {
+        if (file.mimetype.startsWith("image/")) {
             cb(null, true);
         }
         else {

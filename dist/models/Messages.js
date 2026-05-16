@@ -39,7 +39,7 @@ const msgSchema = new mongoose_1.Schema({
     chatId: {
         type: mongoose_1.Schema.Types.ObjectId,
         ref: "Chat",
-        require: true,
+        required: true,
     },
     sender: {
         type: String,

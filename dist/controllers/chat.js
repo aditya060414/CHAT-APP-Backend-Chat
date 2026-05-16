@@ -9,16 +9,16 @@ const Chat_js_1 = __importDefault(require("../models/Chat.js"));
 const Messages_1 = require("../models/Messages");
 const axios_1 = __importDefault(require("axios"));
 exports.CreateNewChat = (0, TryCatchBlock_1.default)(async (req, res) => {
-    const userId = req.user?._id;
-    const { otherUserId } = req.body;
-    if (!otherUserId) {
+    const { otherUserId, userId: bodyUserId } = req.body;
+    const userId = req.user?._id || bodyUserId;
+    if (!userId || !otherUserId) {
         res.status(400).json({
-            message: "Please provide the other user"
+            message: "Please provide both users",
         });
         return;
     }
     const existingChat = await Chat_js_1.default.findOne({
-        users: { $all: [userId, otherUserId], $size: 2 }
+        users: { $all: [userId, otherUserId], $size: 2 },
     });
     if (existingChat) {
         res.json({
@@ -28,7 +28,11 @@ exports.CreateNewChat = (0, TryCatchBlock_1.default)(async (req, res) => {
         return;
     }
     const newChat = await Chat_js_1.default.create({
-        users: [userId, otherUserId]
+        users: [userId, otherUserId],
+        latestMessage: {
+            text: "",
+            sender: "",
+        }
     });
     res.status(201).json({
         message: "Chat created successfully",
@@ -46,32 +50,33 @@ exports.getAllChats = (0, TryCatchBlock_1.default)(async (req, res) => {
     const chats = await Chat_js_1.default.find({
         users: userId,
     }).sort({ updatedAt: -1 });
-    // .populate("users", "name")
     const chatWithUserData = await Promise.all(chats.map(async (chat) => {
-        const otherUserId = chat.users.find((id) => id !== userId);
+        const otherUserId = chat.users.find((id) => id.toString() !== userId.toString());
         const unseenCount = await Messages_1.Messages.countDocuments({
             chatId: chat._id,
-            sender: { $ne: userId },
+            sender: { $ne: userId.toString() },
             seen: false,
         });
         try {
             const { data } = await axios_1.default.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
             return {
-                user: data,
+                user: data.user,
                 chat: {
                     ...chat.toObject(),
                     latestMessage: chat.latestMessage || null,
                     unseenCount,
-                }
+                },
             };
         }
         catch (error) {
             console.log(error);
             return {
-                user: { id: otherUserId, name: "Unknown" },
-                ...chat.toObject(),
-                latestMessage: chat.latestMessage || null,
-                unseenCount,
+                user: { _id: otherUserId, name: "Unknown" },
+                chat: {
+                    ...chat.toObject(),
+                    latestMessage: chat.latestMessage || null,
+                    unseenCount,
+                }
             };
         }
     }));
@@ -85,40 +90,41 @@ exports.sendMessage = (0, TryCatchBlock_1.default)(async (req, res) => {
     const imageFile = req.file;
     if (!senderId) {
         res.status(401).json({
-            messages: "Unauthorized request"
+            messages: "Unauthorized request",
         });
         return;
     }
+    //   const senderUser = await User.findById(senderId).select("name");
     if (!chatId) {
         res.status(400).json({
-            message: "Id missing."
+            message: "Id missing.",
         });
         return;
     }
     if (!text && !imageFile) {
         res.status(400).json({
-            message: "Missing data."
+            message: "Missing data.",
         });
         return;
     }
     const chat = await Chat_js_1.default.findById(chatId);
     if (!chat) {
         res.status(404).json({
-            message: "Chat not found."
+            message: "Chat not found.",
         });
         return;
     }
     const isUserInChat = chat.users.some((userId) => userId.toString() === senderId.toString());
     if (!isUserInChat) {
         res.status(403).json({
-            message: "Unauthorized request"
+            message: "Unauthorized request",
         });
         return;
     }
     const otherUserId = chat.users.find((userId) => userId.toString() !== senderId.toString());
     if (!otherUserId) {
         res.status(401).json({
-            messages: "Unauthorized request"
+            messages: "Unauthorized request",
         });
         return;
     }
@@ -162,27 +168,27 @@ exports.getMessageByChat = (0, TryCatchBlock_1.default)(async (req, res) => {
     const { chatId } = req.params;
     if (!chatId) {
         res.status(400).json({
-            message: "Id missing."
+            message: "Id missing.",
         });
         return;
     }
     if (!userId) {
         res.status(401).json({
-            message: "Unauthorized Request."
+            message: "Unauthorized Request.",
         });
         return;
     }
     const chat = await Chat_js_1.default.findById(chatId);
     if (!chat) {
         res.status(404).json({
-            message: "Chat not found."
+            message: "Chat not found.",
         });
         return;
     }
-    const isUserInChat = chat.users.some((userId) => userId.toString() === userId.toString());
+    const isUserInChat = chat.users.some((id) => id.toString() === userId.toString());
     if (!isUserInChat) {
         res.status(403).json({
-            message: "Unauthorized request"
+            message: "Unauthorized request",
         });
         return;
     }
@@ -200,28 +206,28 @@ exports.getMessageByChat = (0, TryCatchBlock_1.default)(async (req, res) => {
         seenAt: new Date(),
     });
     const messages = await Messages_1.Messages.find({
-        chatId: chatId
+        chatId: chatId,
     }).sort({ createdAt: 1 });
-    const otherUserId = chat.users.find((id) => id !== userId);
+    const otherUserId = chat.users.find((id) => id.toString() !== userId.toString());
     try {
         const { data } = await axios_1.default.get(`${process.env.USER_SERVICE}/api/v1/user/${otherUserId}`);
         if (!otherUserId) {
             res.status(401).json({
-                message: "Unauthorized request."
+                message: "Unauthorized request.",
             });
             return;
         }
         // socket work
-        res.status(201).json({
+        return res.status(201).json({
             messages,
-            user: data,
+            user: data.user,
         });
     }
     catch (error) {
         console.log(error);
-        res.json({
+        return res.json({
             messages,
-            user: { _id: otherUserId, name: "Unknown" }
+            user: { _id: otherUserId, name: "Unknown" },
         });
     }
 });
