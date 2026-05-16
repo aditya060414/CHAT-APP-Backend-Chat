@@ -6,12 +6,12 @@ import axios from "axios";
 
 export const CreateNewChat = TryCatch(
   async (req: AuthenticatedRequest, res) => {
-    const userId = req.user?._id;
-    const { otherUserId } = req.body;
+    const { otherUserId, userId: bodyUserId } = req.body;
+    const userId = req.user?._id || bodyUserId;
 
-    if (!otherUserId) {
+    if (!userId || !otherUserId) {
       res.status(400).json({
-        message: "Please provide the other user",
+        message: "Please provide both users",
       });
       return;
     }
@@ -29,6 +29,10 @@ export const CreateNewChat = TryCatch(
     }
     const newChat = await Chat.create({
       users: [userId, otherUserId],
+      latestMessage: {
+        text: "",
+        sender: "",
+      }
     });
 
     res.status(201).json({
@@ -50,9 +54,7 @@ export const getAllChats = TryCatch(async (req: AuthenticatedRequest, res) => {
 
   const chats = await Chat.find({
     users: userId,
-  })
-    .populate("users", "name")
-    .sort({ updatedAt: -1 });
+  }).sort({ updatedAt: -1 });
 
   const chatWithUserData = await Promise.all(
     chats.map(async (chat) => {
@@ -223,7 +225,7 @@ export const getMessageByChat = TryCatch(
       return;
     }
     const isUserInChat = chat.users.some(
-      (userId) => userId.toString() === userId.toString(),
+      (id) => id.toString() === userId.toString(),
     );
 
     if (!isUserInChat) {
@@ -254,7 +256,7 @@ export const getMessageByChat = TryCatch(
       chatId: chatId,
     }).sort({ createdAt: 1 });
 
-    const otherUserId = chat.users.find((id) => id.toString() !== userId);
+    const otherUserId = chat.users.find((id) => id.toString() !== userId.toString());
 
     try {
       const { data } = await axios.get(
